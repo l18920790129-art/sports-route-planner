@@ -8,7 +8,14 @@ import re
 from openai import OpenAI
 
 # 使用环境变量中已配置的API Key和Base URL
-client = OpenAI()
+# 兼容新版openai库（不传proxies参数）
+_api_key = os.environ.get('OPENAI_API_KEY', '')
+_base_url = os.environ.get('OPENAI_BASE_URL', None)
+
+if _base_url:
+    client = OpenAI(api_key=_api_key, base_url=_base_url)
+else:
+    client = OpenAI(api_key=_api_key)
 
 INTENT_PARSE_PROMPT = """你是一个专业的运动路线规划助手，负责将用户的自然语言运动需求解析为结构化的JSON参数。
 
