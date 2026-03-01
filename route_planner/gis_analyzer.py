@@ -42,8 +42,8 @@ def get_road_network(target_distance_km: float = 9.0) -> nx.MultiDiGraph:
     获取路网，根据目标距离自动调整范围，并缓存避免重复下载
     """
     global _GRAPH_CACHE
-    # 目标距离的一半作为路网半径（环形路线），最小3km，最大8km
-    needed_radius = max(3000, min(8000, int(target_distance_km * 500)))
+    # 目标距离的一半作为路网半径（环形路线），最小3km，最大5km（节省内存）
+    needed_radius = max(3000, min(5000, int(target_distance_km * 400)))
 
     if _GRAPH_CACHE is not None:
         cached_radius = _GRAPH_CACHE.graph.get('dist', 0)
