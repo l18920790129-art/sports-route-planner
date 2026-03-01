@@ -9,9 +9,15 @@ import numpy as np
 import json
 import random
 import math
+import os
+from pathlib import Path
 from shapely.geometry import Point, LineString
 import warnings
 warnings.filterwarnings('ignore')
+
+# 预生成路网数据文件路径
+DATA_DIR = Path(__file__).resolve().parent / 'data'
+PREBUILT_GRAPHML = DATA_DIR / 'xiamen_walk_5km.graphml'
 
 # ============================================================
 # 研究区域：厦门市环岛路附近
@@ -39,27 +45,32 @@ _GRAPH_CACHE = None
 
 def get_road_network(target_distance_km: float = 9.0) -> nx.MultiDiGraph:
     """
-    获取路网，根据目标距离自动调整范围，并缓存避免重复下载
+    获取路网：优先从预生成的本地文件加载（节省内存和时间），否则从OSM下载
     """
     global _GRAPH_CACHE
-    # 目标距离的一半作为路网半径（环形路线），最小3km，最大5km（节省内存）
-    needed_radius = max(3000, min(5000, int(target_distance_km * 400)))
 
     if _GRAPH_CACHE is not None:
-        cached_radius = _GRAPH_CACHE.graph.get('dist', 0)
-        if cached_radius >= needed_radius:
-            print(f"[GIS] 使用缓存路网（半径{cached_radius}m）")
-            return _GRAPH_CACHE
+        print(f"[GIS] 使用内存缓存路网")
+        return _GRAPH_CACHE
 
-    print(f"[GIS] 正在从OSM获取路网，中心点: {STUDY_AREA_CENTER}，半径: {needed_radius}m ...")
-    G = ox.graph_from_point(
-        STUDY_AREA_CENTER,
-        dist=needed_radius,
-        network_type='walk',
-        simplify=True
-    )
-    G.graph['dist'] = needed_radius
-    print(f"[GIS] 路网获取完成：{len(G.nodes)} 个节点，{len(G.edges)} 条边")
+    # 优先加载预生成的本地路网文件
+    if PREBUILT_GRAPHML.exists():
+        print(f"[GIS] 从本地文件加载预生成路网: {PREBUILT_GRAPHML}")
+        G = ox.load_graphml(str(PREBUILT_GRAPHML))
+        G.graph['dist'] = 5000
+        print(f"[GIS] 路网加载完成：{len(G.nodes)} 个节点，{len(G.edges)} 条边")
+    else:
+        # 回退：从OSM实时下载
+        needed_radius = max(3000, min(5000, int(target_distance_km * 400)))
+        print(f"[GIS] 本地文件不存在，从OSM获取路网，中心点: {STUDY_AREA_CENTER}，半径: {needed_radius}m ...")
+        G = ox.graph_from_point(
+            STUDY_AREA_CENTER,
+            dist=needed_radius,
+            network_type='walk',
+            simplify=True
+        )
+        G.graph['dist'] = needed_radius
+        print(f"[GIS] 路网获取完成：{len(G.nodes)} 个节点，{len(G.edges)} 条边")
 
     # NDVI & 路面分析
     G = _annotate_ndvi(G)
